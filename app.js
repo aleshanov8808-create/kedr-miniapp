@@ -32,7 +32,13 @@
   var DOW = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
 
   var tg = window.Telegram && window.Telegram.WebApp;
-  var inTelegram = !!(tg && tg.initData);
+  // Внутри клиента Telegram platform != "unknown". sendData работает только при запуске
+  // с reply-кнопки клавиатуры — в этом режиме Telegram оставляет initData ПУСТЫМ.
+  // Меню-кнопка, прямая ссылка, inline-кнопка → initData заполнен, sendData недоступен.
+  var inTelegram = !!(tg && tg.platform && tg.platform !== "unknown");
+  var canSendData = inTelegram && !tg.initData && typeof tg.sendData === "function";
+  var qsBot = new URLSearchParams(location.search).get("bot") || "";
+  var BOT_USERNAME = /^[A-Za-z0-9_]{5,32}$/.test(qsBot) ? qsBot : "kedr_demo_booking_bot";
   var $ = function (id) { return document.getElementById(id); };
 
   // ===== Даты (локальные, без часовых поясов) =====
@@ -309,18 +315,19 @@
   }
 
   // ===== Проверка и отправка =====
-  function nameVal() { return $("name").value.trim().slice(0, 60); }
+  function nameVal() { return Array.from($("name").value.trim()).slice(0, 60).join("").trim(); }
+  function phoneOk(v) { return PHONE_RE.test(v) && v.replace(/\D/g, "").length >= 10; }
   function phoneVal() { return $("phone").value.trim().slice(0, 20); }
   function validate(show) {
     var problems = [];
     var datesOk = !!(st.ci && st.co && nights() >= 1 && nights() <= MAX_NIGHTS && st.ci >= TODAY && st.ci <= LAST_CI);
     if (!datesOk) problems.push("sec-dates");
-    var nameOk = nameVal().length >= 2, phoneOk = PHONE_RE.test(phoneVal());
-    if (!nameOk || !phoneOk) problems.push("sec-contacts");
+    var nameOk = Array.from(nameVal()).length >= 2, phoneGood = phoneOk(phoneVal());
+    if (!nameOk || !phoneGood) problems.push("sec-contacts");
     if (show) {
       $("sec-dates").classList.toggle("invalid", !datesOk);
       $("name").parentNode.classList.toggle("bad", !nameOk);
-      $("phone").parentNode.classList.toggle("bad", !phoneOk);
+      $("phone").parentNode.classList.toggle("bad", !phoneGood);
     }
     return problems;
   }
@@ -338,15 +345,85 @@
       $(problems[0]).scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
-    var data = JSON.stringify(payload());
+    var p = payload();
+    var data = JSON.stringify(p);
     window.__lastPayload = data;
-    if (inTelegram && typeof tg.sendData === "function") {
+    if (canSendData) {
       haptic("success");
-      tg.sendData(data); // Telegram закроет приложение и передаст заявку боту
-    } else {
-      $("outside-note").hidden = false;
-      toast("Отправка работает только внутри Telegram");
+      try { tg.sendData(data); } catch (e) { openBot(p); return; } // Telegram закроет приложение
+      // Если клиент почему-то не закрыл приложение — не оставляем гостя в тупике.
+      setTimeout(function () { openBot(p); }, 3000);
+      return;
     }
+    openBot(p);
+  }
+
+  // ===== Резерв: заявка в /start-ссылке (≤64 символов [A-Za-z0-9_-]) — тот же формат, что deeplink.py =====
+  var B36 = "0123456789abcdefghijklmnopqrstuvwxyz";
+  function b36(n, width) {
+    var s = Number(n).toString(36);
+    if (width && s.length > width) throw new Error("overflow");
+    while (width && s.length < width) s = "0" + s;
+    return s;
+  }
+  function cpOk(ch) {
+    var o = ch.codePointAt(0);
+    return (o >= 0x20 && o <= 0x7e) || (o >= 0x410 && o <= 0x44f) || ch === "Ё" || ch === "ё";
+  }
+  function cpBytes(str) {
+    return Array.from(str).map(function (ch) {
+      var o = ch.codePointAt(0);
+      if (ch === "Ё") return 0xa8;
+      if (ch === "ё") return 0xb8;
+      return o <= 0x7e ? o : o - 0x350;
+    });
+  }
+  function b64url(bytes) {
+    var bin = "";
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function encodeStart(p) {
+    var houses = Object.keys(HOUSES), extras = Object.keys(EXTRAS);
+    var digits = p.phone.replace(/\D/g, "").slice(0, 18);
+    var flags = 0;
+    (p.extras || []).forEach(function (e) { var i = extras.indexOf(e); if (i >= 0) flags |= 1 << i; });
+    if (p.phone.charAt(0) === "+") flags |= 1 << extras.length;
+    var ph = BigInt("1" + digits).toString(36);
+    var c = p.ci.split("-");
+    var days = Math.round((Date.UTC(+c[0], +c[1] - 1, +c[2]) - Date.UTC(2020, 0, 1)) / 86400000);
+    var chars = Array.from(p.name.trim().split(/\s+/).join(" ")).slice(0, 60);
+    var mode = chars.every(cpOk) ? "a" : "b";
+    var head = mode + b36(houses.indexOf(p.h), 1) + b36(days, 3) + b36(p.n, 1) + b36(p.g, 1) +
+      b36(flags, 1) + b36(ph.length, 1) + ph;
+    var room = 64 - head.length, out = "";
+    for (var i = chars.length; i > 0; i--) {
+      var part = chars.slice(0, i).join("").replace(/\s+$/, "");
+      var bytes = mode === "a" ? cpBytes(part) : Array.from(new TextEncoder().encode(part));
+      var cand = b64url(bytes);
+      if (cand.length <= room) { out = cand; break; }
+    }
+    return head + out;
+  }
+  window.__encodeStart = encodeStart; // для автотестов
+
+  function openBot(p) {
+    var link = "https://t.me/" + BOT_USERNAME + "?start=" + encodeStart(p);
+    window.__lastLink = link;
+    $("handoff-link").href = link;
+    $("toast").classList.remove("show");
+    $("handoff").hidden = false;
+    document.body.classList.add("handoff-open");
+    try { if (inTelegram && tg.MainButton) tg.MainButton.hide(); } catch (e) {}
+    haptic("success");
+    if (inTelegram && typeof tg.openTelegramLink === "function") {
+      try {
+        tg.openTelegramLink(link);
+        setTimeout(function () { try { tg.close(); } catch (e) {} }, 400);
+        return;
+      } catch (e) {}
+    }
+    if (!window.__noRedirect) setTimeout(function () { location.href = link; }, 300);
   }
 
   function render() {
@@ -366,7 +443,7 @@
     });
     $(id).addEventListener("blur", function () {
       if (!$(id).value.trim()) return;
-      var ok = id === "name" ? nameVal().length >= 2 : PHONE_RE.test(phoneVal());
+      var ok = id === "name" ? Array.from(nameVal()).length >= 2 : phoneOk(phoneVal());
       $(id).parentNode.classList.toggle("bad", !ok);
     });
   });
@@ -379,6 +456,11 @@
     try { tg.setHeaderColor && tg.setHeaderColor("secondary_bg_color"); } catch (e) {}
     try { tg.setBackgroundColor && tg.setBackgroundColor("secondary_bg_color"); } catch (e) {}
   }
+  $("handoff-back").onclick = function () {
+    $("handoff").hidden = true;
+    document.body.classList.remove("handoff-open");
+    try { if (inTelegram && tg.MainButton) tg.MainButton.show(); } catch (e) {}
+  };
   if (inTelegram && tg.MainButton) {
     tg.MainButton.setText("Отправить заявку");
     tg.MainButton.onClick(submit);

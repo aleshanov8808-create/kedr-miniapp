@@ -75,11 +75,19 @@
       <div class="total"><span>К оплате</span><b id="total">0 ₽</b></div>
       <p class="hint">Предоплата 30% — после подтверждения брони хозяином.</p>
       <button type="button" class="send" id="send-fallback" hidden>Отправить заявку</button>
-      <p class="note" id="outside-note" hidden>Отправка заявки работает внутри Telegram: откройте приложение кнопкой «✨ Открыть приложение» в боте @kedr_demo_booking_bot.</p>
     </section>
 
     <footer class="foot">Сделано <b>DRAGON DEV STUDIO</b></footer>
   </main>
+  <div class="handoff" id="handoff" hidden>
+    <div class="handoff__card" role="dialog" aria-live="polite">
+      <div class="handoff__spin"></div>
+      <h2>Открываем Telegram, чтобы отправить заявку…</h2>
+      <p>В чате с ботом нажмите <b>«Запустить»</b> (если появится), а затем <b>«✅ Отправить заявку»</b>.</p>
+      <a class="send handoff__btn" id="handoff-link" href="#" target="_top" rel="noopener">Открыть Telegram и отправить</a>
+      <button type="button" class="handoff__back" id="handoff-back">← Вернуться к заявке</button>
+    </div>
+  </div>
   <div class="toast" id="toast" role="status"></div>
   <script src="app.js"></script>
 </body>
