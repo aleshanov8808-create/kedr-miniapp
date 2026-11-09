@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Гостевой дом «Кедр» — бронирование</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <h1 class="hero__title">Гостевой дом «Кедр»</h1>
+        <p class="hero__sub">📍 Адыгея, пос. Гузерипль</p>
+      </div>
+    </header>
+
+    <section class="block" id="sec-house">
+      <h2 class="block__title"><span class="num">1</span> Выберите домик</h2>
+      <div class="houses" id="houses"></div>
+    </section>
+
+    <section class="block" id="sec-dates">
+      <h2 class="block__title"><span class="num">2</span> Даты</h2>
+      <p class="hint" id="date-hint">Выберите день заезда</p>
+      <div class="cal">
+        <div class="cal__nav">
+          <button type="button" class="cal__btn" id="prev" aria-label="Предыдущий месяц">‹</button>
+          <div class="cal__month" id="month"></div>
+          <button type="button" class="cal__btn" id="next" aria-label="Следующий месяц">›</button>
+        </div>
+        <div class="cal__dow"><span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span></div>
+        <div class="cal__grid" id="grid"></div>
+        <div class="cal__legend">
+          <span><i class="lg lg--sel"></i>выбрано</span>
+          <span><i class="lg lg--busy"></i>занято</span>
+        </div>
+      </div>
+      <div class="range" id="range"></div>
+    </section>
+
+    <section class="block" id="sec-guests">
+      <h2 class="block__title"><span class="num">3</span> Гости</h2>
+      <div class="stepper">
+        <button type="button" class="stepper__btn" id="g-minus" aria-label="Меньше">−</button>
+        <div class="stepper__val"><b id="g-val">1</b><small id="g-max"></small></div>
+        <button type="button" class="stepper__btn" id="g-plus" aria-label="Больше">+</button>
+      </div>
+    </section>
+
+    <section class="block" id="sec-extras">
+      <h2 class="block__title"><span class="num">4</span> Дополнительно</h2>
+      <div class="extras" id="extras"></div>
+    </section>
+
+    <section class="block" id="sec-contacts">
+      <h2 class="block__title"><span class="num">5</span> Контакты</h2>
+      <label class="field">
+        <span>Имя</span>
+        <input id="name" type="text" maxlength="60" autocomplete="name" placeholder="Как к вам обращаться">
+        <em class="err" id="name-err">Минимум 2 буквы</em>
+      </label>
+      <label class="field">
+        <span>Телефон</span>
+        <input id="phone" type="tel" maxlength="20" autocomplete="tel" inputmode="tel" placeholder="+7 900 000-00-00">
+        <em class="err" id="phone-err">Проверьте номер: 10–18 цифр, можно +, пробелы, скобки и дефисы</em>
+      </label>
+    </section>
+
+    <section class="block summary" id="sec-summary">
+      <h2 class="block__title"><span class="num">6</span> Итого</h2>
+      <div id="summary"></div>
+      <div class="total"><span>К оплате</span><b id="total">0 ₽</b></div>
+      <p class="hint">Предоплата 30% — после подтверждения брони хозяином.</p>
+      <button type="button" class="send" id="send-fallback" hidden>Отправить заявку</button>
+      <p class="note" id="outside-note" hidden>Отправка заявки работает внутри Telegram: откройте приложение кнопкой «✨ Открыть приложение» в боте @kedr_demo_booking_bot.</p>
+    </section>
+
+    <footer class="foot">Сделано <b>DRAGON DEV STUDIO</b></footer>
+  </main>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
